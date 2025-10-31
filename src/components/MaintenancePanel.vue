@@ -82,7 +82,7 @@ const reachabilityText = computed(() => {
 
 <style>
 .mp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000}
-.mp-modal{width:min(820px,92vw);max-height:92vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:auto;display:flex;flex-direction:column}
+.mp-modal{width:min(820px,92vw);max-height:92vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:auto;display:flex;flex-direction:column;color:black}
 .mp-head{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid #eee}
 .mp-head .spacer{flex:1}
 .link{background:none;border:none;color:#2563eb;cursor:pointer}

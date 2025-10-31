@@ -1,7 +1,20 @@
 <template>
   <div class="demo-root">
     <aside class="sidebar">
-      <div class="brand">Inforef RTLS - DEMO</div>
+      <div class="brand">Inforef RTLS Demo</div>
+
+      <!-- Link esterno subito sotto il brand -->
+      <div class="external-link-wrapper">
+        <a
+          class="top-link-btn"
+          href="https://demo.sgslweb.com/backofficeAzienda.jsp"
+          target="_blank"
+          rel="noopener"
+          title="Apri INOFREF DEMO"
+        >
+          SICURWEB DEMO
+        </a>
+      </div>
 
       <div class="controls">
         <label>Struttura</label>
@@ -24,22 +37,6 @@
         </div>
         <div class="btn-row">
           <button @click="simulateOnce" :disabled="overviewMode">Simula sample</button>
-        </div>
-
-        <!-- Destinazione e simulazione ambulanza -->
-        <div class="btn-row">
-          <label style="color:#cbd5e1;align-self:flex-start;margin-top:8px">Destinazione</label>
-          <select v-model="targetSiteId">
-            <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.ragioneSociale }}</option>
-          </select>
-        </div>
-        <div class="btn-row">
-          <button @click="simulateAmbulance" :disabled="!selectedSiteId || !targetSiteId || selectedSiteId===targetSiteId">Simula ambulanza</button>
-        </div>
-
-        <!-- Pulsante test apertura manutenzione -->
-        <div class="btn-row">
-          <button @click="openMaintenanceTest">Test manutenzione (ECG)</button>
         </div>
       </div>
 
@@ -204,10 +201,10 @@
         </div>
       </div>
 
-      <!-- VISTA SITO: Dashboard operativa -->
+      <!-- VISTA SITO: SOLO mappa + tabella risorse -->
       <div v-else class="site-dashboard">
-        <!-- Header con informazioni sito -->
-        <div class="site-header">
+        <!-- Header sito -->
+        <div class="site-header sticky">
           <div class="site-info">
             <h2>{{ selectedSiteLabel }}</h2>
             <div class="site-stats">
@@ -237,38 +234,47 @@
           </div>
         </div>
 
-        <!-- Piantine rapide per reparti principali -->
-        <div class="floor-plans-overview">
-          <h3>Mappe Reparti</h3>
-          <div class="plans-grid">
-            <div class="plan-card" v-for="dept in mainDepartments" :key="dept.name">
-              <div class="plan-image">
-                <div class="plan-placeholder">
-                  <span class="placeholder-icon">🏥</span>
-                  <small>Mappa {{ dept.name }}</small>
-                </div>
-                <div class="plan-overlay">
-                  <button class="btn-view" @click="openFloorPlan(selectedSiteId, dept.name, dept.floor)">
-                    Apri Mappa
-                  </button>
-                </div>
-              </div>
-              <div class="plan-info">
-                <h4>{{ dept.name }}</h4>
-                <div class="plan-stats">
-                  <span class="badge">{{ dept.assets }} risorse</span>
-                  <span class="badge" :class="dept.statusClass">{{ dept.status }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Lista risorse per reparto in formato tabellare (dalla versione vecchia) -->
+        <!-- Tabella risorse per reparto -->
         <div class="dept-panel">
-          <div class="dept-header">
+          <div class="dept-header sticky">
             <h3>Risorse per Reparto — {{ selectedSiteLabel }}</h3>
             <div class="spacer"></div>
+
+            <!-- Filtro testuale live -->
+            <div class="filters">
+              <input
+                class="filter-input"
+                type="text"
+                v-model="tableSearch"
+                placeholder="Filtra nome, categoria o stanza…"
+                aria-label="Filtro risorse"
+              />
+              <button class="link clear" v-if="tableSearch" @click="tableSearch=''">Pulisci</button>
+            </div>
+
+            <!-- Filtri rapidi per tipologia -->
+            <div class="chips">
+              <button :class="['chip', {active: tableCategory==='all'}]" @click="tableCategory='all'">Tutto</button>
+              <button :class="['chip', {active: tableCategory==='pazienti'}]" @click="tableCategory='pazienti'">Pazienti</button>
+              <button :class="['chip', {active: tableCategory==='personale'}]" @click="tableCategory='personale'">Personale</button>
+              <button :class="['chip', {active: tableCategory==='dispositivi'}]" @click="tableCategory='dispositivi'">Dispositivi</button>
+            </div>
+
+            <!-- Tasti Formazione e Visite -->
+            <div class="quick-actions">
+              <select v-model="selectedPersonForQual" class="qa-select" aria-label="Seleziona personale">
+                <option :value="null">Seleziona personale…</option>
+                <option v-for="p in staffList" :key="p.id" :value="p.id">{{ p.nome }}</option>
+              </select>
+              <button class="qa-btn" :disabled="!selectedPersonForQual" @click="openQualifyById(selectedPersonForQual)">Apri Formazione</button>
+
+              <select v-model="selectedPatientForVisits" class="qa-select" aria-label="Seleziona paziente">
+                <option :value="null">Seleziona paziente…</option>
+                <option v-for="p in patientList" :key="p.id" :value="p.id">{{ p.nome }}</option>
+              </select>
+              <button class="qa-btn" :disabled="!selectedPatientForVisits" @click="openVisitsById(selectedPatientForVisits)">Visite mediche</button>
+            </div>
+
             <button class="link" @click="expandAll">Espandi tutto</button>
             <button class="link" @click="collapseAll">Comprimi tutto</button>
           </div>
@@ -292,10 +298,10 @@
                 <table class="resources-table">
                   <thead>
                     <tr>
-                      <th>Nome</th>
-                      <th>Categoria</th>
-                      <th>Stanza</th>
-                      <th>Stato</th>
+                      <th class="col-name">Nome</th>
+                      <th class="col-cat">Categoria</th>
+                      <th class="col-room">Stanza</th>
+                      <th class="col-state">Stato</th>
                       <th class="th-actions">Azioni</th>
                     </tr>
                   </thead>
@@ -316,9 +322,12 @@
                       </td>
                       <td class="td-actions">
                         <button @click="openCamera(a.cameraUrl)" :disabled="!a.cameraUrl" class="btn-ghost">Camera</button>
-                        <button v-if="isHealthcare(a)" @click="openQualify(a)" class="btn-ghost">Qualifica</button>
+                        <!-- Etichetta "Formazione" -->
+                        <button v-if="isHealthcare(a)" @click="openQualify(a)" class="btn-ghost">Formazione</button>
+                        <!-- Manutenzione include anche ESTINTORI -->
                         <button v-if="isMaintainable(a)" @click="openMaintenanceFor(a)" class="btn-ghost">Manutenzione</button>
                         <button v-if="isPatient(a) && a.ehrUrl" @click="openPatientRecord(a)" class="btn-ghost">Fascicolo</button>
+                        <button v-if="isPatient(a) || isHealthcare(a)" @click="openMedicalVisits(a)" class="btn-ghost">Visite mediche</button>
                       </td>
                     </tr>
                   </tbody>
@@ -342,6 +351,11 @@
         v-if="maintPanel.show"
         :asset="maintPanel.asset"
         @close="maintPanel.show=false"
+      />
+      <medical-visits-modal
+        v-if="visitsModal.show"
+        :asset="visitsModal.asset"
+        @close="visitsModal.show=false"
       />
       <floor-plan
         v-if="floorPlan.show"
@@ -379,6 +393,7 @@ import CameraModal from './CameraModal.vue'
 import MaintenanceList from './MaintenanceList.vue'
 import QualificationPanel from './QualificationPanel.vue'
 import MaintenancePanel from './MaintenancePanel.vue'
+import MedicalVisitsModal from './MedicalVisitsModal.vue'
 import FloorPlan from './FloorPlan.vue'
 import createLocalsenseAdapter from '../services/localsenseAdapter.js'
 
@@ -407,21 +422,21 @@ const featureMap = new Map()
 const mapWrapEl = ref(null)
 let ro = null
 
-// Simulazione veicolo
-const targetSiteId = ref(sites[1]?.id || sites[0]?.id || null)
-let currentSimCancel = null
-
 // Stato vista
 const overviewMode = ref(true)
-const selectedSiteId = ref(sites[0]?.id || null)
+// Preseleziona 'sorrisi' se presente
+const selectedSiteId = ref((sites.find(s => s.id === 'sorrisi')?.id) || sites[0]?.id || null)
 
 // Controlli mappa avanzati
 const useClustering = ref(true)
 const currentFilter = ref('all')
 
-// Centro/rotazione iniziali
-let defaultCenter = sites[0]?.lon && sites[0]?.lat ? fromLonLat([Number(sites[0].lon), Number(sites[0].lat)]) : fromLonLat([14.8484, 40.6369])
-let rotationDeg = Number(sites[0]?.rotationDeg || 0)
+// Centro/rotazione iniziali: preferisci 'sorrisi' se presente
+const defaultSiteForCenter = sites.find(s => s.id === 'sorrisi') || sites[0]
+let defaultCenter = defaultSiteForCenter?.lon && defaultSiteForCenter?.lat
+  ? fromLonLat([Number(defaultSiteForCenter.lon), Number(defaultSiteForCenter.lat)])
+  : fromLonLat([14.8484, 40.6369])
+let rotationDeg = Number(defaultSiteForCenter?.rotationDeg || 0)
 
 // Coords puliti
 const sitesWithCoords = computed(() =>
@@ -432,41 +447,70 @@ const sitesWithCoords = computed(() =>
 const selectedSite = computed(() => sites.find(s => s.id === selectedSiteId.value) || null)
 const selectedSiteLabel = computed(() => selectedSite.value ? selectedSite.value.ragioneSociale : '—')
 
+// Base: filtra per sito (veicoli sempre visibili anche in vista sito)
 const filteredAssets = computed(() =>
   assetList.value.filter(a => {
-    // In overview (selectedSiteId nullo) mostra tutto
     if (!selectedSiteId.value) return true
-    // Veicoli sempre visibili in vista sito
     if ((a.categoria || '').toLowerCase() === 'veicolo') return true
-    // Altrimenti filtra per sito selezionato
     return a.siteId === selectedSiteId.value
   })
 )
-// Calcoli per la dashboard sito
+
+// Filtro testuale e per tipologia (tabella)
+const tableSearch = ref('')
+const tableCategory = ref('all') // all | pazienti | personale | dispositivi
+
+const tableAssets = computed(() => {
+  const q = (tableSearch.value || '').trim().toLowerCase()
+  return filteredAssets.value.filter(a => {
+    // filtro categoria rapida
+    if (tableCategory.value !== 'all') {
+      const cat = (a.categoria || '').toLowerCase()
+      if (tableCategory.value === 'pazienti' && !cat.includes('paziente')) return false
+      if (tableCategory.value === 'personale' && !cat.includes('personale')) return false
+      if (tableCategory.value === 'dispositivi' && !(cat.includes('dispositivo') || cat.includes('infrastruttura') || cat.includes('sicurezza') || cat.includes('sensor'))) return false
+    }
+    // filtro testuale
+    if (!q) return true
+    const nome = (a.nome || '').toLowerCase()
+    const catFull = ((a.categoria || a.tipo || '')).toLowerCase()
+    const stanza = (a.stanza || '').toLowerCase()
+    return nome.includes(q) || catFull.includes(q) || stanza.includes(q)
+  })
+})
+
+
+// Apre il modal "Visite mediche" per l'asset selezionato (paziente o personale)
+function openMedicalVisits(asset) {
+  visitsModal.value = { show: true, asset }
+}
+
+// Dalla tendina rapida: cerca prima tra pazienti poi tra personale e apre il modal
+function openVisitsById(patientId) {
+  const asset =
+    patientList.value.find(p => p.id === patientId) ||
+    staffList.value.find(p => p.id === patientId)
+  if (asset) openMedicalVisits(asset)
+}
+
+// Liste per "Formazione" e "Visite mediche"
+const staffList = computed(() => tableAssets.value.filter(isHealthcare))
+const patientList = computed(() => tableAssets.value.filter(isPatient))
+const selectedPersonForQual = ref(null)
+const selectedPatientForVisits = ref(null)
+
+// Calcoli KPI (non influenzati dal filtro testuale)
 const activePatientsCount = computed(() => 
   filteredAssets.value.filter(a => isPatient(a) && (!a.stato || !String(a.stato).toLowerCase().includes('dimesso'))).length
 )
-
 const activeStaffCount = computed(() =>
   filteredAssets.value.filter(a => isHealthcare(a) && (!a.stato || String(a.stato).toLowerCase().includes('servizio'))).length
 )
-
 const operationalStatus = computed(() => {
   const issues = filteredAssets.value.filter(a => 
     a.stato && ['guasto', 'manutenzione', 'critico'].some(s => String(a.stato).toLowerCase().includes(s))
   ).length
   return issues === 0 ? 'OTTIMO' : issues <= 2 ? 'BUONO' : 'ATTENZIONE'
-})
-
-const mainDepartments = computed(() => {
-  const depts = groupedByDept.value.slice(0, 6)
-  return depts.map(dept => ({
-    name: dept.key,
-    assets: dept.items.length,
-    floor: 1,
-    status: getDeptStatusText(dept.items),
-    statusClass: getDeptStatus(dept.items)
-  }))
 })
 
 // Helpers reparto
@@ -525,9 +569,10 @@ const deptPriority = [
   'Magazzino ausili','Reception','Locale tecnico','Esterni','Sicurezza','Infrastruttura'
 ]
 
+// Gruppo per reparto basato sui risultati del filtro
 const groupedByDept = computed(() => {
   const buckets = Object.create(null)
-  for (const a of filteredAssets.value) {
+  for (const a of tableAssets.value) {
     const key = getDeptKey(a)
     ;(buckets[key] ||= []).push(a)
   }
@@ -574,7 +619,6 @@ function makeAdvancedStyle(feature) {
   const categoria = (props.categoria || '').toLowerCase()
   const stato = (props.stato || '').toLowerCase()
   
-  // Colori per categoria
   let color, icon
   switch (true) {
     case categoria.includes('personale'):
@@ -606,7 +650,6 @@ function makeAdvancedStyle(feature) {
       icon = '📦'
   }
 
-  // Colore di bordo in base allo stato
   let strokeColor = '#ffffff'
   if (stato.includes('guasto') || stato.includes('critico')) {
     strokeColor = '#ef4444'
@@ -843,7 +886,7 @@ function refreshAssets() {
         switch (currentFilter.value) {
           case 'personale': return cat.includes('personale')
           case 'pazienti': return cat.includes('paziente')
-          case 'dispositivi': return cat.includes('dispositivo')
+          case 'dispositivi': return cat.includes('dispositivo') || cat.includes('infrastruttura') || cat.includes('sicurezza') || cat.includes('sensor')
           default: return true
         }
       })
@@ -1001,7 +1044,7 @@ function simulateOnce() {
   addEvent('Simulazione singola sample')
 }
 
-// --- helper: route curva e veicolo ---
+// --- helper: route curva ---
 function buildCurvedRoute(fromCoord, toCoord, maxOffset = null) {
   const dx = toCoord[0] - fromCoord[0]
   const dy = toCoord[1] - fromCoord[1]
@@ -1015,7 +1058,10 @@ function buildCurvedRoute(fromCoord, toCoord, maxOffset = null) {
   return [fromCoord, mid, toCoord]
 }
 
-// --- Simulazione ambulanza come asset animato ---
+// --- Simulazione ambulanza come asset animato (overview) ---
+let currentSimCancel = null
+let ambulanceTimer = null
+
 function simulateVehicleRouteAsAsset(fromSiteId, toSiteId, duration = 18000) {
   if (!map || !sites) return null
   const fromSite = sites.find(s => s.id === fromSiteId)
@@ -1048,29 +1094,35 @@ function simulateVehicleRouteAsAsset(fromSiteId, toSiteId, duration = 18000) {
     veh.lat = Number(fromSite.lat)
   }
 
-  // Feature visibile in OVERVIEW (layer assetSrc)
+  // Feature visibile in OVERVIEW (riusa se esiste)
   let overviewFeature = null
   if (assetSrc) {
-    overviewFeature = new Feature({
-      geometry: new Point(fromLonLat([Number(fromSite.lon), Number(fromSite.lat)])),
-      ...veh
-    })
-    overviewFeature.setId(vehId)
-    // stile più visibile
-    overviewFeature.setStyle(new Style({
-      image: new CircleStyle({
-        radius: 12,
-        fill: new Fill({ color: '#ef4444' }),
-        stroke: new Stroke({ color: '#fff', width: 2 })
-      }),
-      text: new Text({
-        text: '🚑',
-        offsetY: 0,
-        font: '16px Arial',
-        fill: new Fill({ color: '#fff' })
+    overviewFeature = assetSrc.getFeatureById(vehId)
+    const startCoord = fromLonLat([Number(fromSite.lon), Number(fromSite.lat)])
+    if (!overviewFeature) {
+      overviewFeature = new Feature({
+        geometry: new Point(startCoord),
+        ...veh
       })
-    }))
-    assetSrc.addFeature(overviewFeature)
+      overviewFeature.setId(vehId)
+      overviewFeature.setStyle(new Style({
+        image: new CircleStyle({
+          radius: 12,
+          fill: new Fill({ color: '#ef4444' }),
+          stroke: new Stroke({ color: '#fff', width: 2 })
+        }),
+        text: new Text({
+          text: '🚑',
+          offsetY: 0,
+          font: '16px Arial',
+          fill: new Fill({ color: '#fff' })
+        })
+      }))
+      assetSrc.addFeature(overviewFeature)
+    } else {
+      // riposiziona alla partenza
+      overviewFeature.getGeometry().setCoordinates(startCoord)
+    }
   }
 
   const fromCoord = fromLonLat([Number(fromSite.lon), Number(fromSite.lat)])
@@ -1087,11 +1139,9 @@ function simulateVehicleRouteAsAsset(fromSiteId, toSiteId, duration = 18000) {
     const coord = routeGeom.getCoordinateAt(t)
 
     if (coord) {
-      // Aggiorna feature overview se presente
       if (overviewFeature) {
         overviewFeature.getGeometry().setCoordinates(coord)
       }
-      // Aggiorna dataset (triggera refreshAssets in site view)
       const [lon, lat] = toLonLat(coord)
       veh.lon = lon
       veh.lat = lat
@@ -1106,49 +1156,88 @@ function simulateVehicleRouteAsAsset(fromSiteId, toSiteId, duration = 18000) {
       const [lonF, latF] = toLonLat(toCoord)
       veh.lon = lonF
       veh.lat = latF
-      // Aggiorna ultima posizione feature overview
       if (overviewFeature) {
         overviewFeature.getGeometry().setCoordinates(toCoord)
       }
       currentSimCancel = null
-      addEvent(`Ambulanza arrivata: ${fromSite.ragioneSociale} → ${toSite.ragioneSociale}`)
+      addEvent(`Ambulanza: ${fromSite.ragioneSociale} → ${toSite.ragioneSociale} (arrivo)`)
     }
   }
 
   rafId = requestAnimationFrame(step)
 
-  // Cleanup
+  // Cleanup function (ferma animazione e rimuove risorsa)
   return () => {
     if (rafId) cancelAnimationFrame(rafId)
-    // Rimuovi feature overview
     try {
-      if (overviewFeature && assetSrc) assetSrc.removeFeature(overviewFeature)
+      const feat = assetSrc?.getFeatureById(vehId)
+      if (feat && assetSrc) assetSrc.removeFeature(feat)
     } catch {}
-    // Rimuovi asset dal dataset
     const idx = assetList.value.findIndex(a => a.id === vehId)
     if (idx !== -1) assetList.value.splice(idx, 1)
     currentSimCancel = null
   }
 }
 
-function simulateAmbulance() {
-  if (!selectedSiteId.value || !targetSiteId.value || selectedSiteId.value === targetSiteId.value) {
-    addEvent('Simulazione non valida: seleziona due siti differenti')
-    return
+// Avvio automatico in overview (ciclo)
+function startAmbulanceAuto() {
+  if (!overviewMode.value) return
+  if (!sites || sites.length < 2) return
+  // evita duplicati
+  if (ambulanceTimer) return
+
+  const runOnce = () => {
+    if (!overviewMode.value) return
+    const i = Math.floor(Math.random() * sites.length)
+    let j = Math.floor(Math.random() * sites.length)
+    if (j === i) j = (j + 1) % sites.length
+    const fromSiteId = sites[i].id
+    const toSiteId = sites[j].id
+
+    // stop eventuale sim in corso
+    if (typeof currentSimCancel === 'function') {
+      try { currentSimCancel() } catch {}
+      currentSimCancel = null
+    }
+    currentSimCancel = simulateVehicleRouteAsAsset(fromSiteId, toSiteId, 16000)
+    addEvent(`Ambulanza (auto): ${sites[i].ragioneSociale} → ${sites[j].ragioneSociale}`)
+
+    // pianifica prossima corsa
+    const gap = 4000 + Math.floor(Math.random() * 4000) // 4-8s di pausa
+    ambulanceTimer = setTimeout(() => {
+      ambulanceTimer = null
+      runOnce()
+    }, 16000 + gap)
   }
-  const fromSite = sites.find(s => s.id === selectedSiteId.value)
-  const toSite = sites.find(s => s.id === targetSiteId.value)
-  if (!fromSite || !toSite) {
-    addEvent('Simulazione: sito non trovato')
-    return
+
+  runOnce()
+}
+
+// Stop ciclo e pulizia
+function stopAmbulanceAuto() {
+  if (ambulanceTimer) {
+    clearTimeout(ambulanceTimer)
+    ambulanceTimer = null
   }
-  // Se c’è già una simulazione in corso, cancellala
   if (typeof currentSimCancel === 'function') {
     try { currentSimCancel() } catch {}
     currentSimCancel = null
   }
-  currentSimCancel = simulateVehicleRouteAsAsset(selectedSiteId.value, targetSiteId.value, 18000)
-  addEvent(`Simulazione ambulanza: ${fromSite.ragioneSociale} → ${toSite.ragioneSociale}`)
+}
+
+// (Manuale, non esposto in UI) simulazione casuale
+function simulateAmbulance() {
+  const all = sites
+  if (!all || all.length < 2) return
+  const i = Math.floor(Math.random() * all.length)
+  let j = Math.floor(Math.random() * all.length)
+  if (j === i) j = (j + 1) % all.length
+  if (typeof currentSimCancel === 'function') {
+    try { currentSimCancel() } catch {}
+    currentSimCancel = null
+  }
+  currentSimCancel = simulateVehicleRouteAsAsset(all[i].id, all[j].id, 16000)
+  addEvent(`Ambulanza (manuale): ${all[i].ragioneSociale} → ${all[j].ragioneSociale}`)
 }
 
 
@@ -1156,6 +1245,7 @@ function simulateAmbulance() {
 const cameraModal = ref({ show: false, url: null })
 const qualPanel = ref({ show: false, person: null, skills: [] })
 const maintPanel = ref({ show: false, asset: null })
+const visitsModal = ref({ show: false, asset: null })
 const floorPlan = ref({ show: false, siteId: null, dept: null, floor: null, assets: [] })
 
 function openCamera(url) {
@@ -1167,18 +1257,13 @@ function openQualify(person) {
   const personSkills = skillsByPerson[person.id] || []
   qualPanel.value = { show: true, person, skills: personSkills }
 }
+function openQualifyById(personId) {
+  const person = staffList.value.find(p => p.id === personId)
+  if (person) openQualify(person)
+}
 
 function openMaintenanceFor(asset) {
   maintPanel.value = { show: true, asset }
-}
-
-function openMaintenanceTest() {
-  const ecg = assetList.value.find(a => a.tipo && a.tipo.toLowerCase().includes('ecg'))
-  if (ecg) {
-    openMaintenanceFor(ecg)
-  } else {
-    addEvent('Nessun dispositivo ECG trovato per il test')
-  }
 }
 
 function openMainFloorPlan() {
@@ -1220,10 +1305,23 @@ function isPatient(a) {
   return (a.categoria || '').toLowerCase().includes('paziente')
 }
 
+function isVisitor(a) {
+  const c = (a.categoria || '').toLowerCase()
+  return c.includes('visitat') // 'visitatore' o 'visitatori'
+}
+
+// Nuovo: mostra il bottone Manutenzione per tutti tranne personale, pazienti e visitatori
+function shouldShowMaintenance(a) {
+  return !isHealthcare(a) && !isPatient(a) && !isVisitor(a)
+}
+
 function isMaintainable(a) {
   const tipo = (a.tipo || '').toLowerCase()
+  // Include estintori
   return tipo.includes('ecg') || tipo.includes('monitor') || tipo.includes('defibrillatore') || 
-         tipo.includes('pompa') || tipo.includes('ventilatore') || tipo.includes('dispositivo')
+         tipo.includes('pompa') || tipo.includes('ventilatore') || tipo.includes('dispositivo') ||
+         tipo.includes('estintore')||
+         tipo.includes('carrello')
 }
 
 function getStatusClass(status) {
@@ -1233,24 +1331,6 @@ function getStatusClass(status) {
   if (s.includes('attenzione') || s.includes('manutenzione')) return 'status-warning'
   if (s.includes('critico') || s.includes('guasto')) return 'status-error'
   return 'status-unknown'
-}
-
-function getResourceCardClass(a) {
-  const base = 'resource-card'
-  const cat = (a.categoria || '').toLowerCase()
-  const status = (a.stato || '').toLowerCase()
-  
-  let typeClass = ''
-  if (cat.includes('personale')) typeClass = 'type-staff'
-  else if (cat.includes('paziente')) typeClass = 'type-patient'
-  else if (cat.includes('dispositivo')) typeClass = 'type-device'
-  else if (cat.includes('sicurezza')) typeClass = 'type-security'
-  
-  let statusClass = ''
-  if (status.includes('guasto') || status.includes('critico')) statusClass = 'status-critical'
-  else if (status.includes('manutenzione')) statusClass = 'status-maintenance'
-  
-  return `${base} ${typeClass} ${statusClass}`.trim()
 }
 
 function getDeptStatus(items) {
@@ -1311,7 +1391,6 @@ const overviewCards = computed(() => {
       manutenzioniInCorso: Math.floor(Math.random() * 3),
       manutenzioneClass: Math.random() > 0.7 ? 'status-warning' : 'status-ok'
     }
-    const formazione = { completata: Math.floor(Math.random() * 30) + 70, ecmPoints: Math.floor(Math.random() * 100) + 50 }
     const skills = { acquired: Math.floor(Math.random() * 50) + 100, expiring: Math.floor(Math.random() * 10), todo: Math.floor(Math.random() * 5) }
     const riskScore = Math.floor(Math.random() * 30) + 10
     const risk = {
@@ -1319,12 +1398,7 @@ const overviewCards = computed(() => {
       levelClass: riskScore < 20 ? 'risk-low' : riskScore < 40 ? 'risk-medium' : 'risk-high',
       levelText: riskScore < 20 ? 'BASSO' : riskScore < 40 ? 'MEDIO' : 'ALTO'
     }
-    
-    return {
-      id: site.id,
-      name: site.ragioneSociale,
-      counts, totals, utilization, prestazioni, sicurezza, formazione, skills, risk
-    }
+    return { id: site.id, name: site.ragioneSociale, counts, totals, utilization, prestazioni, sicurezza, skills, risk }
   })
 })
 
@@ -1334,14 +1408,25 @@ function getUtilizationClass(utilization) {
   return 'utilization-low'
 }
 
-// Lifecycle
+// Lifecycle: avvio con 'sorrisi' selezionata in vista sito e demo attiva
 onMounted(() => {
+  // seleziona 'sorrisi' se presente e passa subito alla vista sito
+  const defaultSite = sites.find(s => s.id === 'sorrisi') || sites[0] || null
+  if (defaultSite) selectedSiteId.value = defaultSite.id
+  overviewMode.value = false
   initMap()
+  // avvia la demo e centra la mappa quando i layer sono pronti
+  setTimeout(() => {
+    startDemo()
+    refreshSites()
+    refreshAssets()
+    fitAll()
+  }, 700)
 })
 
 onUnmounted(() => {
   if (ro && mapWrapEl.value) ro.unobserve(mapWrapEl.value)
-  if (currentSimCancel) currentSimCancel()
+  stopAmbulanceAuto()
 })
 
 // Watchers
@@ -1349,6 +1434,12 @@ watch([overviewMode, selectedSiteId], () => {
   nextTick(() => {
     refreshSites()
     refreshAssets()
+    // Gestione auto-ambulanza on/off a seconda della vista
+    if (overviewMode.value) {
+      startAmbulanceAuto()
+    } else {
+      stopAmbulanceAuto()
+    }
   })
 })
 
@@ -1388,6 +1479,28 @@ watch(assetList, () => {
   background: #0f172a;
   color: #38bdf8;
   border-bottom: 1px solid #334155;
+}
+
+/* Bottone link esterno sotto il brand */
+.external-link-wrapper {
+  padding: 12px 20px 0 20px;
+  border-bottom: 1px solid #334155;
+}
+.top-link-btn {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  padding: 10px 12px;
+  background: #3b82f6;
+  color: #0f172a;
+  font-weight: 700;
+  border: 1px solid #60a5fa;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.top-link-btn:hover {
+  background: #2563eb;
+  color: #fff;
 }
 
 .controls {
@@ -1477,7 +1590,7 @@ watch(assetList, () => {
 .map-wrapper {
   position: relative;
   flex: 1;
-  min-height: 400px;
+  min-height: 320px;
 }
 
 #map {
@@ -1760,6 +1873,7 @@ watch(assetList, () => {
   border-bottom: 1px solid #334155;
   padding: 20px;
 }
+.site-header.sticky { position: sticky; top: 0; z-index: 5; }
 
 .site-info h2 {
   margin-bottom: 15px;
@@ -1819,123 +1933,49 @@ watch(assetList, () => {
   background: #64748b;
 }
 
-.floor-plans-overview {
-  padding: 20px;
-  border-bottom: 1px solid #334155;
-}
+/* Tabella risorse (tema scuro, leggibile) */
+.dept-panel { margin-top: 10px; background: #0f172a; border-top: 1px solid #334155; border-bottom: 1px solid #334155; }
+.dept-header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #334155; background: #0f172a; gap: 10px; flex-wrap: wrap; position: relative; z-index: 6; }
+.dept-header.sticky { position: sticky; top: 72px; } /* resta visibile durante lo scroll */
+.dept-header h3 { margin: 0; color: #e2e8f0; }
+.dept-header .spacer { flex: 1; }
+.dept-header .link { color: #60a5fa; }
 
-.floor-plans-overview h3 {
-  margin-bottom: 15px;
-  color: #e2e8f0;
-}
-
-.plans-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.plan-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.plan-image {
-  position: relative;
-  height: 120px;
-  background: #0f172a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.plan-placeholder {
-  text-align: center;
-  color: #64748b;
-}
-
-.placeholder-icon {
-  font-size: 32px;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.plan-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.plan-image:hover .plan-overlay {
-  opacity: 1;
-}
-
-.btn-view {
-  background: #3b82f6;
-  border: none;
-  color: white;
-  padding: 8px 16px;
+.filters { display: flex; align-items: center; gap: 8px; }
+.filter-input {
+  width: 260px;
+  max-width: 70vw;
+  padding: 8px 10px;
+  background: #0b152b;
+  border: 1px solid #243244;
   border-radius: 6px;
+  color: #e2e8f0;
+}
+.link.clear { color: #93c5fd; }
+
+.chips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip { padding: 6px 10px; border-radius: 999px; border: 1px solid #334155; background: #132641; color: #e2e8f0; font-size: 12px; cursor: pointer; }
+.chip.active { background: #2563eb; border-color: #3b82f6; }
+
+.quick-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.qa-select {
+  padding: 6px 8px;
+  background: #0b152b;
+  border: 1px solid #243244;
+  border-radius: 6px;
+  color: #e2e8f0;
+  min-width: 200px;
+}
+.qa-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
   cursor: pointer;
-  font-weight: 600;
 }
-
-.btn-view:hover {
-  background: #2563eb;
-}
-
-.plan-info {
-  padding: 12px;
-}
-
-.plan-info h4 {
-  margin-bottom: 8px;
-  color: #e2e8f0;
-}
-
-.plan-stats {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-/* Nuova sezione: lista tabellare (tema scuro) */
-.dept-panel {
-  margin-top: 10px;
-  background: #0f172a;
-  border-top: 1px solid #334155;
-  border-bottom: 1px solid #334155;
-}
-
-.dept-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #334155;
-}
-
-.dept-header h3 {
-  margin: 0;
-  color: #e2e8f0;
-}
-
-.dept-header .spacer {
-  flex: 1;
-}
-
-.dept-header .link {
-  color: #60a5fa;
-}
+.qa-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.qa-btn:not(:disabled):hover { background: #243446; border-color: #3d4e63; }
 
 .accordion {
   display: flex;
@@ -2003,6 +2043,7 @@ watch(assetList, () => {
   width: 100%;
   border-collapse: collapse;
   background: #0f172a;
+  table-layout: fixed;
 }
 
 .resources-table thead th {
@@ -2012,13 +2053,27 @@ watch(assetList, () => {
   font-size: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid #16233f;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
+
+.resources-table .col-name { width: 32%; }
+.resources-table .col-cat { width: 18%; }
+.resources-table .col-room { width: 18%; }
+.resources-table .col-state { width: 14%; }
+.th-actions { width: 18%; }
 
 .resources-table tbody td {
   padding: 10px 16px;
   border-bottom: 1px solid #16233f;
   color: #e2e8f0;
   font-size: 13px;
+  word-break: break-word;
+}
+
+.resources-table tbody tr:nth-child(even) {
+  background: #0e1a32;
 }
 
 .resources-table tbody tr:hover {
@@ -2035,7 +2090,7 @@ watch(assetList, () => {
   font-size: 11px;
 }
 
-.th-actions, .td-actions {
+.td-actions {
   text-align: left;
   white-space: nowrap;
 }
@@ -2110,10 +2165,6 @@ watch(assetList, () => {
     gap: 15px;
   }
   
-  .plans-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-  
   .map-controls {
     top: 10px;
     right: 10px;
@@ -2124,6 +2175,7 @@ watch(assetList, () => {
     left: 10px;
   }
 
+  .filter-input { width: 100%; max-width: 100%; }
   .resources-table thead th,
   .resources-table tbody td {
     padding: 10px 12px;
